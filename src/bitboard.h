@@ -80,9 +80,16 @@ extern Bitboard LineBB[SQUARE_NB][SQUARE_NB];
 extern Bitboard PseudoAttacks[PIECE_TYPE_NB][SQUARE_NB];
 extern Bitboard PawnAttacks[COLOR_NB][SQUARE_NB];
 
+#ifdef USE_PEXT
+#ifdef IS_64BIT
+#define MAGIC_ALIGN alignas(16)
+#endif
+#else
+#define MAGIC_ALIGN
+#endif
 
 /// Magic holds all magic bitboards relevant data for a single square
-struct Magic {
+struct MAGIC_ALIGN Magic {
   Bitboard  mask;
   Bitboard* attacks;
 #ifndef USE_PEXT
