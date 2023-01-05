@@ -56,9 +56,12 @@ bool CaseInsensitiveLess::operator() (const string& s1, const string& s2) const 
 
 /// UCI::init() initializes the UCI options to their hard-coded default values
 
+#ifdef IS_64BIT
+#define MaxHashMB 33554432
+#else
+#define MaxHashMB 2048
+#endif
 void init(OptionsMap& o) {
-
-  constexpr int MaxHashMB = Is64Bit ? 33554432 : 2048;
 
   o["Debug Log File"]        << Option("", on_logger);
   o["Threads"]               << Option(1, 1, 1024, on_threads);

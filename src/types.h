@@ -85,22 +85,10 @@
 
 namespace Stockfish {
 
-#ifdef USE_POPCNT
-constexpr bool HasPopCnt = true;
+#if defined(IS_64BIT)
+constexpr uint32_t ArchBits = 64;
 #else
-constexpr bool HasPopCnt = false;
-#endif
-
-#ifdef USE_PEXT
-constexpr bool HasPext = true;
-#else
-constexpr bool HasPext = false;
-#endif
-
-#ifdef IS_64BIT
-constexpr bool Is64Bit = true;
-#else
-constexpr bool Is64Bit = false;
+constexpr uint32_t ArchBits = 32;
 #endif
 
 typedef uint64_t Key;

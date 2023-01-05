@@ -145,12 +145,16 @@ namespace {
 
   void init_magics(PieceType pt, Bitboard table[], Magic magics[]) {
 
+    #ifndef USE_PEXT
     // Optimal PRNG seeds to pick the correct magics in the shortest time
     int seeds[][RANK_NB] = { { 8977, 44560, 54343, 38998,  5731, 95205, 104912, 17020 },
                              {  728, 10316, 55013, 32803, 12281, 15100,  16645,   255 } };
+    int epoch[4096] = {}, cnt = 0;
+    Bitboard occupancy[4096], reference[4096];
+    #endif
 
-    Bitboard occupancy[4096], reference[4096], edges, b;
-    int epoch[4096] = {}, cnt = 0, size = 0;
+    Bitboard edges, b;
+    int size = 0;
 
     for (Square s = SQ_A1; s <= SQ_H8; ++s)
     {
@@ -164,9 +168,9 @@ namespace {
         // apply to the 64 or 32 bits word to get the index.
         Magic& m = magics[s];
         m.mask  = sliding_attack(pt, s, 0) & ~edges;
-#ifndef USE_PEXT
-        m.shift = (Is64Bit ? 64 : 32) - popcount(m.mask);
-#endif
+        #ifndef USE_PEXT
+            m.shift = ArchBits - popcount(m.mask);
+        #endif
         // Set the offset for the attacks table of the square. We have individual
         // table sizes for each square with "Fancy Magic Bitboards".
         m.attacks = s == SQ_A1 ? table : magics[s - 1].attacks + size;
@@ -175,46 +179,46 @@ namespace {
         // store the corresponding sliding attack bitboard in reference[].
         b = size = 0;
         do {
-            occupancy[size] = b;
-            reference[size] = sliding_attack(pt, s, b);
-
-#ifdef USE_PEXT
-            m.attacks[pext(b, m.mask)] = reference[size];
-#endif
+            #ifdef USE_PEXT
+                m.attacks[pext(b, m.mask)] = sliding_attack(pt, s, b);
+            #else
+                occupancy[size] = b;
+                reference[size] = sliding_attack(pt, s, b);
+            #endif
             size++;
             b = (b - m.mask) & m.mask;
         } while (b);
 
-#ifndef USE_PEXT
-        PRNG rng(seeds[Is64Bit][rank_of(s)]);
+        #ifndef USE_PEXT
+            PRNG rng(seeds[ArchBits == 64][rank_of(s)]);
 
-        // Find a magic for square 's' picking up an (almost) random number
-        // until we find the one that passes the verification test.
-        for (int i = 0; i < size; )
-        {
-            for (m.magic = 0; popcount((m.magic * m.mask) >> 56) < 6; )
-                m.magic = rng.sparse_rand<Bitboard>();
-
-            // A good magic must map every possible occupancy to an index that
-            // looks up the correct sliding attack in the attacks[s] database.
-            // Note that we build up the database for square 's' as a side
-            // effect of verifying the magic. Keep track of the attempt count
-            // and save it in epoch[], little speed-up trick to avoid resetting
-            // m.attacks[] after every failed attempt.
-            for (++cnt, i = 0; i < size; ++i)
+            // Find a magic for square 's' picking up an (almost) random number
+            // until we find the one that passes the verification test.
+            for (int i = 0; i < size; )
             {
-                unsigned idx = m.index(occupancy[i]);
+                for (m.magic = 0; popcount((m.magic * m.mask) >> 56) < 6; )
+                    m.magic = rng.sparse_rand<Bitboard>();
 
-                if (epoch[idx] < cnt)
+                // A good magic must map every possible occupancy to an index that
+                // looks up the correct sliding attack in the attacks[s] database.
+                // Note that we build up the database for square 's' as a side
+                // effect of verifying the magic. Keep track of the attempt count
+                // and save it in epoch[], little speed-up trick to avoid resetting
+                // m.attacks[] after every failed attempt.
+                for (++cnt, i = 0; i < size; ++i)
                 {
-                    epoch[idx] = cnt;
-                    m.attacks[idx] = reference[i];
+                    unsigned idx = m.index(occupancy[i]);
+
+                    if (epoch[idx] < cnt)
+                    {
+                        epoch[idx] = cnt;
+                        m.attacks[idx] = reference[i];
+                    }
+                    else if (m.attacks[idx] != reference[i])
+                        break;
                 }
-                else if (m.attacks[idx] != reference[i])
-                    break;
             }
-        }
-#endif
+        #endif
     }
   }
 }

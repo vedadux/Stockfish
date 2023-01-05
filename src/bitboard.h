@@ -80,16 +80,8 @@ extern Bitboard LineBB[SQUARE_NB][SQUARE_NB];
 extern Bitboard PseudoAttacks[PIECE_TYPE_NB][SQUARE_NB];
 extern Bitboard PawnAttacks[COLOR_NB][SQUARE_NB];
 
-#ifdef USE_PEXT
-#ifdef IS_64BIT
-#define MAGIC_ALIGN alignas(16)
-#endif
-#else
-#define MAGIC_ALIGN
-#endif
-
 /// Magic holds all magic bitboards relevant data for a single square
-struct MAGIC_ALIGN Magic {
+struct Magic {
   Bitboard  mask;
   Bitboard* attacks;
 #ifndef USE_PEXT
@@ -98,17 +90,15 @@ struct MAGIC_ALIGN Magic {
 #endif
   // Compute the attack's index using the 'magic bitboards' approach
   unsigned index(Bitboard occupied) const {
-
-#ifdef USE_PEXT
+    #if defined(USE_PEXT)
         return unsigned(pext(occupied, mask));
-#else
-        if (Is64Bit)
-            return unsigned(((occupied & mask) * magic) >> shift);
-
+    #elif defined(IS_64BIT)
+        return unsigned(((occupied & mask) * magic) >> shift);
+    #else
         unsigned lo = unsigned(occupied) & unsigned(mask);
         unsigned hi = unsigned(occupied >> 32) & unsigned(mask >> 32);
         return (lo * unsigned(magic) ^ hi * unsigned(magic >> 32)) >> shift;
-#endif
+    #endif
   }
 };
 

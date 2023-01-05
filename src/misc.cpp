@@ -253,14 +253,20 @@ std::string compiler_info() {
   #endif
 
   compiler += "\nCompilation settings include: ";
-  compiler += (Is64Bit ? " 64bit" : " 32bit");
+  #if defined(IS_64BIT)
+    compiler += " 64bit";
+  #else
+    compiler += " 32bit";
+  #endif
   #if defined(USE_VNNI)
     compiler += " VNNI";
   #endif
   #if defined(USE_AVX512)
     compiler += " AVX512";
   #endif
-  compiler += (HasPext ? " BMI2" : "");
+  #if defined(USE_PEXT)
+    compiler += " BMI2";
+  #endif
   #if defined(USE_AVX2)
     compiler += " AVX2";
   #endif
@@ -273,7 +279,9 @@ std::string compiler_info() {
   #if defined(USE_SSE2)
     compiler += " SSE2";
   #endif
-  compiler += (HasPopCnt ? " POPCNT" : "");
+  #if defined(USE_POPCNT)
+    compiler += " POPCNT";
+  #endif
   #if defined(USE_MMX)
     compiler += " MMX";
   #endif
