@@ -164,8 +164,9 @@ namespace {
         // apply to the 64 or 32 bits word to get the index.
         Magic& m = magics[s];
         m.mask  = sliding_attack(pt, s, 0) & ~edges;
+#ifndef USE_PEXT
         m.shift = (Is64Bit ? 64 : 32) - popcount(m.mask);
-
+#endif
         // Set the offset for the attacks table of the square. We have individual
         // table sizes for each square with "Fancy Magic Bitboards".
         m.attacks = s == SQ_A1 ? table : magics[s - 1].attacks + size;
@@ -177,16 +178,14 @@ namespace {
             occupancy[size] = b;
             reference[size] = sliding_attack(pt, s, b);
 
-            if (HasPext)
-                m.attacks[pext(b, m.mask)] = reference[size];
-
+#ifdef USE_PEXT
+            m.attacks[pext(b, m.mask)] = reference[size];
+#endif
             size++;
             b = (b - m.mask) & m.mask;
         } while (b);
 
-        if (HasPext)
-            continue;
-
+#ifndef USE_PEXT
         PRNG rng(seeds[Is64Bit][rank_of(s)]);
 
         // Find a magic for square 's' picking up an (almost) random number
@@ -215,6 +214,7 @@ namespace {
                     break;
             }
         }
+#endif
     }
   }
 }
