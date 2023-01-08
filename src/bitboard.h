@@ -80,30 +80,49 @@ extern Bitboard LineBB[SQUARE_NB][SQUARE_NB];
 extern Bitboard PseudoAttacks[PIECE_TYPE_NB][SQUARE_NB];
 extern Bitboard PawnAttacks[COLOR_NB][SQUARE_NB];
 
+constexpr unsigned BishopBits = 9;
+constexpr unsigned RookBits = 12;
+
 /// Magic holds all magic bitboards relevant data for a single square
+template <unsigned bits>
 struct Magic {
   Bitboard  mask;
-  Bitboard* attacks;
 #ifndef USE_PEXT
   Bitboard  magic;
-  unsigned  shift;
 #endif
+
+  constexpr Magic() {};
+  constexpr Magic(Bitboard ms, Bitboard mg) :
+    mask(ms)
+#ifndef USE_PEXT
+    , magic(mg)
+#endif
+  {
+      assert(ms != 0);
+  }
+
   // Compute the attack's index using the 'magic bitboards' approach
-  unsigned index(Bitboard occupied) const {
-    #if defined(USE_PEXT)
+  [[nodiscard]] constexpr unsigned index(Bitboard occupied) const {
+    #ifdef USE_PEXT
         return unsigned(pext(occupied, mask));
-    #elif defined(IS_64BIT)
-        return unsigned(((occupied & mask) * magic) >> shift);
     #else
-        unsigned lo = unsigned(occupied) & unsigned(mask);
-        unsigned hi = unsigned(occupied >> 32) & unsigned(mask >> 32);
-        return (lo * unsigned(magic) ^ hi * unsigned(magic >> 32)) >> shift;
+        constexpr unsigned shift = ArchBits - bits;
+        #ifdef IS_64BIT
+            return unsigned(((occupied & mask) * magic) >> shift);
+        #else
+            unsigned lo = unsigned(occupied) & unsigned(mask);
+            unsigned hi = unsigned(occupied >> 32) & unsigned(mask >> 32);
+            return (lo * unsigned(magic) ^ hi * unsigned(magic >> 32)) >> shift;
+        #endif
     #endif
   }
 };
 
-extern Magic RookMagics[SQUARE_NB];
-extern Magic BishopMagics[SQUARE_NB];
+extern std::array<Magic<RookBits>, SQUARE_NB> RookMagics;
+extern std::array<Magic<BishopBits>, SQUARE_NB> BishopMagics;
+
+extern std::array<std::array<Bitboard, (1 << RookBits)>, SQUARE_NB>   RookAttackTable;
+extern std::array<std::array<Bitboard, (1 << BishopBits)>, SQUARE_NB> BishopAttackTable;
 
 inline Bitboard square_bb(Square s) {
   assert(is_ok(s));
@@ -310,8 +329,8 @@ inline Bitboard attacks_bb(Square s, Bitboard occupied) {
 
   switch (Pt)
   {
-  case BISHOP: return BishopMagics[s].attacks[BishopMagics[s].index(occupied)];
-  case ROOK  : return   RookMagics[s].attacks[  RookMagics[s].index(occupied)];
+  case BISHOP: return BishopAttackTable[s][BishopMagics[s].index(occupied)];
+  case ROOK  : return RookAttackTable[s][RookMagics[s].index(occupied)];
   case QUEEN : return attacks_bb<BISHOP>(s, occupied) | attacks_bb<ROOK>(s, occupied);
   default    : return PseudoAttacks[Pt][s];
   }
